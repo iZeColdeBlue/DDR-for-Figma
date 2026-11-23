@@ -1,12 +1,17 @@
 {
   "name": "Figma Docs Sync",
+  "id": "1701656089622844145",
   "api": "1.0.0",
-  "editorType": ["figma"],
+  "editorType": [
+    "figma"
+  ],
   "main": "dist/code.js",
   "ui": "dist/ui.html",
   "documentAccess": "dynamic-page",
   "networkAccess": {
-    "allowedDomains": ["https://api.github.com"],
+    "allowedDomains": [
+      "https://api.github.com"
+    ],
     "reasoning": "Commits the generated Markdown and images to the user's own GitHub repository."
   }
 }

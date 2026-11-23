@@ -63,11 +63,46 @@ export function sha1Hex(data: Uint8Array): string {
 
 /** git blob SHA: sha1("blob " + len + "\0" + bytes) — identical to what GitHub reports. */
 export function gitBlobSha(bytes: Uint8Array): string {
-  const header = new TextEncoder().encode(`blob ${bytes.length}\0`);
+  const header = utf8(`blob ${bytes.length}\0`);
   const all = new Uint8Array(header.length + bytes.length);
   all.set(header);
   all.set(bytes, header.length);
   return sha1Hex(all);
 }
 
-export const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
+/**
+ * UTF-8 encode a string. Hand-written because Figma's main-thread sandbox has no TextEncoder.
+ * Same output as `new TextEncoder().encode(s)`: lone surrogates become U+FFFD (EF BF BD).
+ */
+export function utf8(s: string): Uint8Array {
+  const out = new Uint8Array(s.length * 3); // UTF-16 unit -> at most 3 bytes (pairs: 2 units -> 4 bytes)
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    let c = s.charCodeAt(i);
+    if (c >= 0xd800 && c <= 0xdfff) {
+      const next = i + 1 < s.length ? s.charCodeAt(i + 1) : 0;
+      if (c <= 0xdbff && next >= 0xdc00 && next <= 0xdfff) {
+        c = 0x10000 + ((c - 0xd800) << 10) + (next - 0xdc00);
+        i++;
+      } else {
+        c = 0xfffd;
+      }
+    }
+    if (c < 0x80) {
+      out[n++] = c;
+    } else if (c < 0x800) {
+      out[n++] = 0xc0 | (c >> 6);
+      out[n++] = 0x80 | (c & 63);
+    } else if (c < 0x10000) {
+      out[n++] = 0xe0 | (c >> 12);
+      out[n++] = 0x80 | ((c >> 6) & 63);
+      out[n++] = 0x80 | (c & 63);
+    } else {
+      out[n++] = 0xf0 | (c >> 18);
+      out[n++] = 0x80 | ((c >> 12) & 63);
+      out[n++] = 0x80 | ((c >> 6) & 63);
+      out[n++] = 0x80 | (c & 63);
+    }
+  }
+  return out.slice(0, n);
+}
