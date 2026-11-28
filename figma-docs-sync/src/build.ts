@@ -1,6 +1,6 @@
 // build: snapshot -> DocModel -> assets exported -> Markdown -> files with git SHAs.
 // Glue between the layers; pure apart from the injected `exportPng` callback.
-import type { DocModel, OutFile } from "./types";
+import type { OutFile } from "./types";
 import { extractDoc } from "./extract/extract";
 import type { NodeLike } from "./extract/nodeLike";
 import { renderDoc } from "./render/markdown";
@@ -24,7 +24,6 @@ export type BuiltDoc = {
   path: string;
   nodeId: string;
   markdown: string;
-  model: DocModel;
   files: OutFile[];
   warnings: string[];
 };
@@ -58,5 +57,5 @@ export async function buildDoc(input: BuildInput): Promise<BuiltDoc> {
   for (const a of assets) files.push({ path: a.path, bytes: png.get(a.nodeId) as Uint8Array, sha: "" });
   for (const f of files) f.sha = gitBlobSha(f.bytes);
 
-  return { docId: input.docId, title: model.title, relPath: input.relPath, path, nodeId: model.figma.nodeId, markdown, model, files, warnings };
+  return { docId: input.docId, title: model.title, relPath: input.relPath, path, nodeId: model.figma.nodeId, markdown, files, warnings };
 }

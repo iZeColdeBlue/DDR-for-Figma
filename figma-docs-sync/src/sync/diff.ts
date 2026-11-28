@@ -21,6 +21,10 @@ export type DiffInput = {
   overwrite?: ReadonlySet<string>;
   /** If false, deletions are only reported (pending), not performed. */
   confirmDeletes?: boolean;
+  /** Current Figma file. Missing Docs owned by another file are left alone. */
+  fileKey?: string;
+  /** Stable per-file id; decides ownership. Unowned legacy entries are then never treated as ours. */
+  fileId?: string;
 };
 
 export type DocDiff = {
@@ -84,6 +88,8 @@ export function computeDiff(input: DiffInput): DiffResult {
   const docDiffs: DocDiff[] = [];
   const orphans: OrphanDiff[] = [];
   const desiredIds = new Set(docs.map((d) => d.docId));
+  // A path another Doc now writes is handed over, never deleted (else one commit writes and deletes it).
+  const claimed = new Set(docs.flatMap((d) => Object.keys(d.files)));
 
   // ---- Docs that exist in Figma ----
   for (const d of docs) {
@@ -123,7 +129,7 @@ export function computeDiff(input: DiffInput): DiffResult {
     }
 
     for (const [p, m] of Object.entries(oldFiles)) {
-      if (p in d.files) continue;
+      if (claimed.has(p)) continue;
       const r = remote[p];
       if (r === undefined) continue; // already gone; just forget it
       if (r === m || force) removedNow.push(p);
@@ -149,7 +155,7 @@ export function computeDiff(input: DiffInput): DiffResult {
     }
     writes.push(...docWrites);
 
-    const entry: ManifestDoc = { path: d.path, nodeId: d.nodeId, files: nextFiles };
+    const entry: ManifestDoc = { path: d.path, nodeId: d.nodeId, fileKey: input.fileKey ?? old?.fileKey, fileId: input.fileId ?? old?.fileId, files: nextFiles };
     const filesChanged = !sameFiles(oldFiles, nextFiles) || (old && old.path !== d.path);
     entry.nodeId = old && !filesChanged && docWrites.length === 0 ? old.nodeId : d.nodeId;
     nextDocs[d.docId] = entry;
@@ -164,13 +170,18 @@ export function computeDiff(input: DiffInput): DiffResult {
   // ---- Docs in the manifest whose frame no longer exists ----
   for (const [docId, old] of Object.entries(manifest.docs)) {
     if (desiredIds.has(docId)) continue;
+    const mine = old.fileId ? old.fileId === input.fileId : old.fileKey ? old.fileKey === input.fileKey : !input.fileId;
+    if (!mine) {
+      nextDocs[docId] = old; // another Figma file's Doc (or owner unknown): not ours to show or delete
+      continue;
+    }
     const force = overwrite.has(docId);
     const removed: string[] = [];
     const conflicts: string[] = [];
     const keep: Record<string, string> = {};
     for (const [p, m] of Object.entries(old.files)) {
       const r = remote[p];
-      if (r === undefined) continue;
+      if (r === undefined || claimed.has(p)) continue;
       if (r === m || force) {
         removed.push(p);
         if (confirm) deletes.push({ path: p, docId });

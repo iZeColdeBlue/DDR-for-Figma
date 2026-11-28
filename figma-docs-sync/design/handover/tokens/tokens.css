@@ -1,0 +1,55 @@
+/* Figma Docs Sync · design tokens (dark only)
+   Source of truth: tokens.json (design system v1) + status colours and component tokens decided 2026-11-27.
+   Contrast values are WCAG ratios on bg / surface / surface-2. */
+
+:root {
+  /* ---- colour: base ---- */
+  --bg:              #0D1321;  /* plugin ground */
+  --surface:         #161D2E;  /* cards, panels, tab track, banner body */
+  --surface-2:       #1F2840;  /* inputs, active tab, disabled button fill */
+  --border:          #2C3651;  /* dividers only, never the only cue for a control */
+  --text:            #F2F4F8;  /* 16.8 / 15.3 / 13.3 */
+  --muted:           #A3ABBF;  /* secondary text, labels, input + secondary-button borders: 8.1 / 7.3 / 6.4 */
+  --accent:          #F5B83D;  /* amber: ONE primary action per view, progress, done checks, required *, focus ring */
+  --on-accent:       #0D1321;  /* text/icons on amber and on status strips */
+  --secondary:       #7C9BF0;  /* links, guide highlight rings, code values */
+  --secondary-hover: #A9BDF5;
+  --scrim:           rgba(8, 12, 22, 0.78); /* behind the notice dialog */
+
+  /* ---- colour: status (all AAA as text on every surface, and navy text on the colour) ---- */
+  --success: #6EE0AE;  /* icon: circle with tick   role="status" */
+  --info:    #6CC6F0;  /* icon: circle with i      role="status" */
+  --warning: #FF9F5E;  /* icon: triangle           role="alert"  never used for actions */
+  --error:   #FFA0A9;  /* icon: octagon with cross role="alert"  */
+
+  /* ---- type ---- */
+  --font-mono: "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* heading-1 22/28 600 mono  "## " marker at 45% opacity
+     heading-2 18/24 500 mono  "### " marker at 45% opacity (setup steps)
+     heading-3 15/20 500 mono  card titles
+     label     11/16 500 mono  uppercase, letter-spacing .14em, muted
+     body      13/20 400 sans
+     body-strong 13/20 600 sans (buttons, banner titles)
+     small     12/18 500 sans (field labels, helper text)
+     code      12/18 400 mono (values, paths, repo names)
+     optional-mark 12px 400 mono muted "(optional)" */
+
+  /* ---- spacing (4px grid) ---- */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px;
+
+  /* ---- radius ---- */
+  --radius-sm: 4px;    /* buttons, inputs, tags */
+  --radius-md: 6px;    /* cards, banners, dialog, tab track */
+  --radius-full: 999px;
+
+  /* ---- sizes ---- */
+  --window-w: 468px;   /* figma.showUI width (overrides tokens.json panel-width 360) */
+  --window-h: 760px;   /* figma.showUI height, same for every screen */
+  --control-sm: 32px;  /* tabs */
+  --control-md: 36px;  /* inputs, inline buttons */
+  --control-lg: 44px;  /* footer actions */
+}
+
+/* No gradients, no shadows anywhere. Focus: 2px solid var(--accent), offset 3px. */

@@ -12,7 +12,7 @@ export function serializeManifest(m: Manifest): string {
     const d = m.docs[id];
     const files: Record<string, string> = {};
     for (const p of Object.keys(d.files).sort()) files[p] = d.files[p];
-    docs[id] = { path: d.path, nodeId: d.nodeId, files };
+    docs[id] = { path: d.path, nodeId: d.nodeId, fileKey: d.fileKey, fileId: d.fileId, files };
   }
   return JSON.stringify({ version: 1, docs }, null, 2) + "\n";
 }

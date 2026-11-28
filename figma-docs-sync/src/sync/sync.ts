@@ -1,6 +1,5 @@
 // sync/sync: orchestrates fetch state -> diff -> one commit. No Figma dependency.
 import type { Manifest } from "../types";
-import { MANIFEST_NAME } from "../types";
 import { utf8 } from "./sha1";
 import { computeDiff, type DesiredDoc, type DiffResult } from "./diff";
 import { emptyManifest, manifestPath, parseManifest, serializeManifest } from "./manifest";
@@ -36,6 +35,8 @@ export type SyncOptions = {
   overwrite?: ReadonlySet<string>;
   deletes?: DeleteMode; // default "ask"
   onProgress?: (msg: string) => void;
+  fileKey?: string;
+  fileId?: string;
 };
 
 export type SyncOutcome =
@@ -69,6 +70,8 @@ async function syncOnce(opts: SyncOptions): Promise<SyncOutcome> {
     remote: state.remote,
     overwrite: opts.overwrite,
     confirmDeletes: mode === "yes",
+    fileKey: opts.fileKey,
+    fileId: opts.fileId,
   });
 
   if (mode === "ask" && diff.pendingDeletes.length > 0) return { kind: "needs-confirmation", diff };
@@ -100,5 +103,3 @@ async function syncOnce(opts: SyncOptions): Promise<SyncOutcome> {
   await client.updateRef(commit.sha);
   return { kind: "committed", diff, commit, message };
 }
-
-export { MANIFEST_NAME };

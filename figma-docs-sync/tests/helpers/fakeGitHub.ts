@@ -13,6 +13,7 @@ export class FakeGitHub {
   owner = "acme";
   repo = "docs-repo";
   branch = "main";
+  archived = false;
   blobs = new Map<string, Uint8Array>();
   trees = new Map<string, Flat>();
   commits = new Map<string, FakeCommit>();
@@ -101,6 +102,13 @@ export class FakeGitHub {
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     let m: RegExpMatchArray | null;
 
+    if (method === "GET" && path === "") return json({ default_branch: "main", archived: this.archived });
+    if (method === "POST" && path === "/git/refs") {
+      // single-branch fake: creating a branch moves the one branch to the new name
+      this.branch = String(body.ref).replace(/^refs\/heads\//, "");
+      this.head = body.sha;
+      return json({ ref: body.ref, object: { sha: body.sha } }, 201);
+    }
     if (method === "GET" && (m = path.match(/^\/git\/ref\/heads\/(.+)$/))) {
       if (decodeURIComponent(m[1]) !== this.branch) return json({ message: "Not Found" }, 404);
       return json({ object: { sha: this.head } });

@@ -1,24 +1,38 @@
 // Message protocol between the plugin main thread (extract) and the UI iframe (network + sync).
 // No Figma dependency.
 
-export type Settings = {
+/** Per Figma file, shared with everyone who opens it (figma.root plugin data). Never holds the token. */
+export type FileConfig = {
+  /** "" = nothing set up yet */
+  mode: "" | "github" | "local";
   owner: string;
   repo: string;
+  /** "" = the repo's default branch */
   branch: string;
   docsFolder: string;
-  /** fine-grained PAT; lives only in figma.clientStorage (and in UI memory while the plugin is open) */
-  token: string;
-  /** optional: figma file URL, used to derive fileKey when figma.fileKey is unavailable */
-  figmaFileUrl: string;
 };
 
-export const DEFAULT_SETTINGS: Settings = {
-  owner: "",
-  repo: "",
-  branch: "main",
-  docsFolder: "docs",
+export const DEFAULT_FILE_CONFIG: FileConfig = { mode: "", owner: "", repo: "", branch: "", docsFolder: "docs" };
+
+/** Per user, this computer only (figma.clientStorage). */
+export type UserConfig = {
+  /** fine-grained PAT; one per user, shared across files */
+  token: string;
+  /** personal overrides for this file; "" = use the file value */
+  branchOverride: string;
+  folderOverride: string;
+  /** screen 19 was dismissed for this file */
+  noticeDismissed: boolean;
+  /** the "Local mode" banner on Home was dismissed for this file */
+  localBannerDismissed: boolean;
+};
+
+export const DEFAULT_USER_CONFIG: UserConfig = {
   token: "",
-  figmaFileUrl: "",
+  branchOverride: "",
+  folderOverride: "",
+  noticeDismissed: false,
+  localBannerDismissed: false,
 };
 
 export type DocInfo = {
@@ -54,18 +68,21 @@ export type BuiltPayload = {
 
 export type UIToMain =
   | { type: "init" }
-  | { type: "saveSettings"; settings: Settings }
+  | { type: "saveFileConfig"; config: FileConfig }
+  | { type: "saveUserConfig"; config: UserConfig }
   | { type: "listDocs" }
   | { type: "mark" }
-  | { type: "setPath"; docId: string; relPath: string }
   | { type: "reId"; docId: string }
   | { type: "focus"; docId: string }
-  | { type: "build" };
+  /** docsFolder: the effective folder (personal override or file value) */
+  | { type: "build"; docsFolder: string };
 
 export type MainToUI =
-  | { type: "settings"; settings: Settings }
+  /** fileId: stable per-file id (figma.fileKey is not available to public plugins) */
+  | { type: "config"; file: FileConfig; user: UserConfig; fileId: string }
   | { type: "docs"; docs: DocInfo[]; fileKey?: string }
   | { type: "selection"; selection: SelectionInfo }
-  | { type: "built"; docs: BuiltPayload[] }
+  | { type: "built"; docs: BuiltPayload[]; fileKey?: string }
   | { type: "progress"; text: string }
-  | { type: "error"; message: string };
+  /** `build`: the failed request was a conversion, so the UI should stop waiting for "built". */
+  | { type: "error"; message: string; build?: boolean };

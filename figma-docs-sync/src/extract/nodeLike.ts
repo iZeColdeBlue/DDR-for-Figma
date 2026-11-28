@@ -9,7 +9,6 @@ export interface TextSegmentLike {
   fontStyle: string;
   fontWeight: number;
   list: "NONE" | "ORDERED" | "UNORDERED";
-  indentation: number;
   href?: string;
   /** Name of the applied text style, if any (e.g. "Heading/H2"). */
   styleName?: string;

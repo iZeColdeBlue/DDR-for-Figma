@@ -1,6 +1,5 @@
 // extract rules (blueprint §5), applied to a NodeLike tree. Pure: no `figma` global.
 import type { Block, DocModel, Span } from "../types";
-import { nodeIdToFile } from "../paths";
 import type { NodeLike, TextSegmentLike } from "./nodeLike";
 
 export type ExtractMeta = {
@@ -23,7 +22,7 @@ export function extractDoc(root: NodeLike, meta: ExtractMeta): DocModel {
   const blocks: Block[] = [];
   for (const it of items) {
     if (it.kind === "image") {
-      blocks.push({ type: "image", assetId: nodeIdToFile(it.node.id), alt: it.node.name, nodeId: it.node.id });
+      blocks.push({ type: "image", alt: it.node.name, nodeId: it.node.id });
     } else {
       pushTextBlocks(blocks, it.node, sizes);
     }

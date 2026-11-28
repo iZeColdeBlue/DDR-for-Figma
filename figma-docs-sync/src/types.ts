@@ -12,7 +12,7 @@ export type Block =
   | { type: "heading"; level: 1 | 2 | 3 | 4; spans: Span[] }
   | { type: "paragraph"; spans: Span[] }
   | { type: "list"; ordered: boolean; items: Span[][] }
-  | { type: "image"; assetId: string; alt: string; nodeId: string };
+  | { type: "image"; alt: string; nodeId: string };
 
 export type DocModel = {
   docId: string; // stable UUID stored in plugin data on the frame
@@ -25,12 +25,16 @@ export type DocModel = {
 /** A file that will exist in the repo. `sha` is the git blob SHA of `bytes`. */
 export type OutFile = { path: string; bytes: Uint8Array; sha: string };
 
-export type AssetRef = { assetId: string; nodeId: string; path: string };
+export type AssetRef = { nodeId: string; path: string };
 
 export type ManifestDoc = {
   path: string;
   nodeId: string;
   files: Record<string, string>; // repo path -> git blob sha
+  /** Figma file that owns this Doc; Docs of other files sharing the folder are never deleted. */
+  fileKey?: string;
+  /** Stable id of the owning Figma file (plugin data; set when figma.fileKey is unavailable to public plugins). */
+  fileId?: string;
 };
 
 export type Manifest = {

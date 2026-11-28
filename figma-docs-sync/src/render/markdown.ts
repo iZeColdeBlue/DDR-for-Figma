@@ -45,7 +45,7 @@ function renderBlock(block: Block, model: DocModel, opts: RenderOptions, assets:
     }
     case "image": {
       const path = assetPath(opts.docsFolder, opts.relPath, block.nodeId);
-      assets.push({ assetId: block.assetId, nodeId: block.nodeId, path });
+      assets.push({ nodeId: block.nodeId, path });
       const rel = relativePath(model.path, path);
       return `![${escapeAlt(block.alt)}](${encodeUrl(rel)})`;
     }

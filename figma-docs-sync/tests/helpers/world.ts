@@ -42,6 +42,6 @@ export class World {
       files: Object.fromEntries(b.files.map((f) => [f.path, f.sha])),
       bytes: Object.fromEntries(b.files.map((f) => [f.path, f.bytes])),
     }));
-    return runSync({ client: o.client ?? this.client(), docsFolder: this.docsFolder, docs, overwrite: new Set(o.overwrite ?? []), deletes: o.deletes, onProgress: o.onProgress });
+    return runSync({ client: o.client ?? this.client(), docsFolder: this.docsFolder, docs, overwrite: new Set(o.overwrite ?? []), deletes: o.deletes, onProgress: o.onProgress, fileKey: "FILEKEY1234" });
   }
 }

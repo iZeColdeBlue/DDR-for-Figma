@@ -63,7 +63,7 @@ npm test             # vitest: render, extract (fake node trees), diff, GitHub s
 npm run typecheck
 npm run check        # both
 npm run coverage     # coverage of render/sync/extract logic
-npm run e2e:ui       # optional: drives dist/ui.html in headless Chromium (needs Playwright available)
+npm run harness:ui   # serves dist/ui.html with a stub main thread + fake GitHub on http://localhost:4173
 ```
 
 The GitHub layer is tested against an **in-memory fake of the GitHub Git Data API**

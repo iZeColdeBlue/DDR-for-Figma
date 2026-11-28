@@ -236,3 +236,65 @@ describe("manifest (de)serialisation", () => {
     expect(() => parseManifest('{"version":1,"docs":{"A":{"path":1}}}')).toThrow(/malformed/);
   });
 });
+
+describe("computeDiff – path handed to another Doc", () => {
+  it("never writes and deletes the same path in one commit", () => {
+    // Frame A deleted; new frame B got the same path; user overwrote B and confirmed deletes.
+    const r = computeDiff({
+      docs: [doc({ [MD]: "new" }, { docId: "B" })],
+      manifest: man({ [MD]: "old" }),
+      remote: { [MD]: "old" },
+      overwrite: new Set(["B"]),
+      confirmDeletes: true,
+    });
+    expect(r.writes.map((w) => w.path)).toEqual([MD]);
+    expect(r.deletes).toEqual([]);
+    expect(r.manifest.docs.A).toBeUndefined();
+    expect(r.manifest.docs.B.files).toEqual({ [MD]: "new" });
+  });
+});
+
+describe("computeDiff – several Figma files share one docs folder", () => {
+  const other: Manifest = { version: 1, docs: { A: { path: MD, nodeId: "1:1", fileKey: "FILE_A", files: { [MD]: "m1" } } } };
+  it("never deletes Docs another file owns", () => {
+    const r = computeDiff({ docs: [], manifest: other, remote: { [MD]: "m1" }, fileKey: "FILE_B", confirmDeletes: true });
+    expect(r.deletes).toEqual([]);
+    expect(r.orphans).toEqual([]);
+    expect(r.manifest).toEqual(other);
+    expect(r.changed).toBe(false);
+  });
+  it("still deletes its own missing Docs", () => {
+    const r = computeDiff({ docs: [], manifest: other, remote: { [MD]: "m1" }, fileKey: "FILE_A", confirmDeletes: true });
+    expect(r.deletes.map((d) => d.path)).toEqual([MD]);
+  });
+  it("records the file key on synced Docs", () => {
+    const r = computeDiff({ docs: [doc({ [MD]: "m1" })], manifest: emptyManifest(), remote: {}, fileKey: "FILE_A" });
+    expect(r.manifest.docs.A.fileKey).toBe("FILE_A");
+  });
+});
+
+describe("computeDiff – file key unavailable (public plugin): ownership by per-file id", () => {
+  const unowned: Manifest = { version: 1, docs: { A: { path: MD, nodeId: "1:1", files: { [MD]: "m1" } } } };
+  const owned = (fileId: string): Manifest => ({ version: 1, docs: { A: { path: MD, nodeId: "1:1", fileId, files: { [MD]: "m1" } } } });
+  it("another file's Docs are neither shown nor deleted", () => {
+    const r = computeDiff({ docs: [], manifest: owned("ID_A"), remote: { [MD]: "m1" }, fileId: "ID_B", confirmDeletes: true });
+    expect(r.orphans).toEqual([]);
+    expect(r.deletes).toEqual([]);
+    expect(r.changed).toBe(false);
+  });
+  it("legacy entries without an owner are left alone once a file id is known", () => {
+    const r = computeDiff({ docs: [], manifest: unowned, remote: { [MD]: "m1" }, fileId: "ID_B", confirmDeletes: true });
+    expect(r.orphans).toEqual([]);
+    expect(r.deletes).toEqual([]);
+  });
+  it("its own missing Docs are still shown and deleted", () => {
+    const r = computeDiff({ docs: [], manifest: owned("ID_A"), remote: { [MD]: "m1" }, fileId: "ID_A", confirmDeletes: true });
+    expect(r.orphans.map((o) => o.docId)).toEqual(["A"]);
+    expect(r.deletes.map((d) => d.path)).toEqual([MD]);
+  });
+  it("records the file id on synced Docs and keeps it in the manifest text", () => {
+    const r = computeDiff({ docs: [doc({ [MD]: "m1" })], manifest: emptyManifest(), remote: {}, fileId: "ID_A" });
+    expect(r.manifest.docs.A.fileId).toBe("ID_A");
+    expect(serializeManifest(r.manifest)).toContain('"fileId": "ID_A"');
+  });
+});

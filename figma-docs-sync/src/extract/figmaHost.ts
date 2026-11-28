@@ -1,18 +1,25 @@
 // The ONLY place that touches the `figma` global (blueprint §4). Everything here is Figma I/O:
 // plugin data, clientStorage, selection, snapshotting nodes into NodeLike, PNG export, UI messaging.
 import type { NodeLike, TextSegmentLike } from "./nodeLike";
-import { DEFAULT_SETTINGS, type DocInfo, type MainToUI, type SelectionInfo, type Settings, type UIToMain } from "../messages";
-import { slugify, uniqueRelPath, normalizeRelPath } from "../paths";
+import { DEFAULT_FILE_CONFIG, DEFAULT_USER_CONFIG, type DocInfo, type FileConfig, type MainToUI, type SelectionInfo, type UIToMain, type UserConfig } from "../messages";
+import { slugify, uniqueRelPath } from "../paths";
 import { uuid } from "../uuid";
 
 const PD = { docId: "fds.docId", relPath: "fds.relPath", nodeId: "fds.nodeId" } as const;
-const SETTINGS_KEY = "fds.settings";
+/** Storage keys. File config: figma.root plugin data. Token + per-file user state: clientStorage. */
+const KEY = {
+  fileConfig: "fds.config",
+  fileId: "fds.fileId",
+  token: "fds.token",
+  user: (fileId: string) => `fds.user:${fileId}`,
+  legacySettings: "fds.settings", // pre-split: everything incl. token in clientStorage
+} as const;
 const DOC_TYPES = ["FRAME", "SECTION", "COMPONENT"] as const;
 const isDocType = (t: string) => (DOC_TYPES as readonly string[]).includes(t);
 
 export const host = {
   showUI(html: string): void {
-    figma.showUI(html, { width: 420, height: 640, themeColors: true });
+    figma.showUI(html, { width: 468, height: 760 });
   },
   onMessage(handler: (m: UIToMain) => void): void {
     figma.ui.onmessage = (m: unknown) => handler(m as UIToMain);
@@ -24,13 +31,52 @@ export const host = {
     figma.on("selectionchange", cb);
   },
 
-  // ----- settings (token lives here only) -----
-  async loadSettings(): Promise<Settings> {
-    const saved = (await figma.clientStorage.getAsync(SETTINGS_KEY)) as Partial<Settings> | undefined;
-    return { ...DEFAULT_SETTINGS, ...(saved ?? {}) };
+  // ----- config: file part in the file, token + overrides on this computer only -----
+  /** Stable per-file id for per-user keys (figma.fileKey is not available to public plugins). */
+  fileId(): string {
+    let id = figma.root.getPluginData(KEY.fileId);
+    if (!id) {
+      id = uuid();
+      figma.root.setPluginData(KEY.fileId, id);
+    }
+    return id;
   },
-  async saveSettings(s: Settings): Promise<void> {
-    await figma.clientStorage.setAsync(SETTINGS_KEY, s);
+  async loadConfig(): Promise<{ file: FileConfig; user: UserConfig; fileId: string }> {
+    const raw = figma.root.getPluginData(KEY.fileConfig);
+    let file: FileConfig = raw ? { ...DEFAULT_FILE_CONFIG, ...JSON.parse(raw) } : { ...DEFAULT_FILE_CONFIG };
+    let token = ((await figma.clientStorage.getAsync(KEY.token)) as string | undefined) ?? "";
+    // One-time migration from the old all-in-clientStorage settings.
+    const legacy = (await figma.clientStorage.getAsync(KEY.legacySettings)) as
+      | { owner?: string; repo?: string; branch?: string; docsFolder?: string; token?: string }
+      | undefined;
+    if (legacy) {
+      if (!token && legacy.token) await figma.clientStorage.setAsync(KEY.token, (token = legacy.token));
+    }
+    const per = (await figma.clientStorage.getAsync(KEY.user(this.fileId()))) as Partial<UserConfig> | undefined;
+    return { file, user: { ...DEFAULT_USER_CONFIG, ...(per ?? {}), token }, fileId: this.fileId() };
+  },
+  /**
+   * One-time migration of the old repo settings into this file. Call only once the file is known to have
+   * Docs (a new file must start with onboarding), and after the UI is up: knowing that needs every page loaded.
+   */
+  async migrateLegacyFile(): Promise<FileConfig | null> {
+    if (figma.root.getPluginData(KEY.fileConfig)) return null;
+    const legacy = (await figma.clientStorage.getAsync(KEY.legacySettings)) as
+      | { owner?: string; repo?: string; branch?: string; docsFolder?: string }
+      | undefined;
+    if (!legacy?.owner || !legacy.repo) return null;
+    const file: FileConfig = { mode: "github", owner: legacy.owner, repo: legacy.repo, branch: legacy.branch ?? "", docsFolder: legacy.docsFolder || "docs" };
+    this.saveFileConfig(file);
+    return file;
+  },
+  saveFileConfig(c: FileConfig): void {
+    const { mode, owner, repo, branch, docsFolder } = c; // whitelist: nothing else, never a token, goes into the file
+    figma.root.setPluginData(KEY.fileConfig, JSON.stringify({ mode, owner, repo, branch, docsFolder }));
+  },
+  async saveUserConfig(c: UserConfig): Promise<void> {
+    const { token, ...perFile } = c;
+    await figma.clientStorage.setAsync(KEY.token, token);
+    await figma.clientStorage.setAsync(KEY.user(this.fileId()), perFile);
   },
 
   fileKey(): string | undefined {
@@ -91,16 +137,6 @@ export const host = {
     n.setPluginData(PD.relPath, relPath);
     n.setPluginData(PD.nodeId, n.id);
     return { docId, relPath };
-  },
-
-  async setRelPath(docId: string, relPath: string, takenByOthers: string[]): Promise<string> {
-    const norm = normalizeRelPath(relPath);
-    if (!norm.ok) throw new Error(norm.error);
-    if (takenByOthers.some((p) => p.toLowerCase() === norm.path.toLowerCase()))
-      throw new Error(`Another Doc already uses ${norm.path}.`);
-    const n = findDocNode(docId);
-    n.setPluginData(PD.relPath, norm.path);
-    return norm.path;
   },
 
   async reId(nodeId: string, takenRelPaths: string[]): Promise<void> {
@@ -191,7 +227,6 @@ async function textSegments(n: TextNode, styleNames: Map<string, string>): Promi
     "fontName",
     "fontWeight",
     "listOptions",
-    "indentation",
     "hyperlink",
     "textStyleId",
   ]);
@@ -212,7 +247,6 @@ async function textSegments(n: TextNode, styleNames: Map<string, string>): Promi
       fontStyle: s.fontName.style,
       fontWeight: s.fontWeight,
       list: s.listOptions.type,
-      indentation: s.indentation,
       href: s.hyperlink && s.hyperlink.type === "URL" ? s.hyperlink.value : undefined,
       styleName,
     });

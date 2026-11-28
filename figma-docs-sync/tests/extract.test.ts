@@ -57,7 +57,7 @@ describe("containers & skipping (rules 3, 5)", () => {
   it("a container with a visible fill/stroke/effect becomes one image and is not descended", () => {
     const card = frame("Card", [text("inner", [seg("hidden in image")])], { paint: true });
     const m = run(frame("d", [card]));
-    expect(m.blocks).toEqual([{ type: "image", assetId: card.id.replace(":", "-"), alt: "Card", nodeId: card.id }]);
+    expect(m.blocks).toEqual([{ type: "image", alt: "Card", nodeId: card.id }]);
   });
   it("skips hidden nodes and names starting with _ (also inside containers)", () => {
     const m = run(
@@ -96,7 +96,7 @@ describe("images (rule 4)", () => {
     const i = shape("x", { type: "INSTANCE" });
     i.id = "I12:346;1:2";
     const m = run(frame("d", [i]));
-    expect(m.blocks[0]).toMatchObject({ assetId: "I12-346-1-2", nodeId: "I12:346;1:2" });
+    expect(m.blocks[0]).toMatchObject({ nodeId: "I12:346;1:2" });
   });
 });
 
@@ -157,7 +157,7 @@ describe("lists", () => {
     expect(m.blocks.length).toBe(2);
   });
   it("nested items (indentation) are flattened", () => {
-    const m = run(frame("d", [text("t", [seg("a\n", { list: "UNORDERED" }), seg("b", { list: "UNORDERED", indentation: 2 })])]));
+    const m = run(frame("d", [text("t", [seg("a\n", { list: "UNORDERED" }), seg("b", { list: "UNORDERED" })])]));
     expect((m.blocks[0] as any).items.length).toBe(2);
   });
   it("list-item rich text keeps spans", () => {

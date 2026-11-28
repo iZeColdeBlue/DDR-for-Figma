@@ -12,13 +12,15 @@ export type GitHubConfig = {
   apiBase?: string;
 };
 
-export type GitHubErrorKind = "auth" | "permission" | "notfound" | "ratelimit" | "empty" | "network" | "other";
+export type GitHubErrorKind = "auth" | "permission" | "approval" | "notfound" | "ratelimit" | "empty" | "network" | "protected" | "other";
 
 export class GitHubError extends Error {
   constructor(
     message: string,
     public kind: GitHubErrorKind,
     public status?: number,
+    /** ratelimit only: minutes until GitHub accepts requests again */
+    public retryMinutes?: number,
   ) {
     super(message);
     this.name = "GitHubError";
@@ -48,6 +50,9 @@ export class GitHubClient {
     return `${this.base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}${p}`;
   }
 
+  /** Expiry of the token, from the last response (fine-grained tokens with an expiry only). */
+  tokenExpires?: Date;
+
   private async request<T>(method: string, path: string, body?: unknown, opts: { raw422?: boolean } = {}): Promise<T> {
     const delays = [500, 1500];
     for (let attempt = 0; ; attempt++) {
@@ -74,8 +79,15 @@ export class GitHubClient {
         await this.sleep(delays[attempt]);
         continue;
       }
+      // e.g. "2026-02-25 12:00:00 UTC"
+      const exp = Date.parse((res.headers.get("github-authentication-token-expiration") ?? "").replace(" UTC", "Z").replace(" ", "T"));
+      if (!isNaN(exp)) this.tokenExpires = new Date(exp);
       if (res.ok) return (await res.json()) as T;
-      if (res.status === 422 && opts.raw422) throw new BranchMovedError();
+      if (res.status === 422 && opts.raw422) {
+        const msg = await res.clone().json().then((j: { message?: string }) => j.message ?? "", () => "");
+        if (/protected/i.test(msg)) throw new GitHubError("This branch is protected. GitHub blocks direct saves to it.", "protected", 422);
+        throw new BranchMovedError();
+      }
       throw await this.toError(res);
     }
   }
@@ -89,8 +101,14 @@ export class GitHubClient {
     }
     const s = res.status;
     if (s === 401) return new GitHubError("GitHub rejected the token (401). It may be wrong or expired.", "auth", s);
-    if (s === 403 && (res.headers.get("x-ratelimit-remaining") === "0" || /rate limit/i.test(msg)))
-      return new GitHubError("GitHub rate limit reached. Wait a few minutes and try again.", "ratelimit", s);
+    if ((s === 403 || s === 429) && (res.headers.get("x-ratelimit-remaining") === "0" || /rate limit/i.test(msg) || s === 429)) {
+      const reset = Number(res.headers.get("x-ratelimit-reset"));
+      const retry = Number(res.headers.get("retry-after"));
+      const mins = retry ? Math.ceil(retry / 60) : reset ? Math.max(1, Math.ceil((reset * 1000 - Date.now()) / 60000)) : undefined;
+      return new GitHubError("GitHub rate limit reached. Wait a few minutes and try again.", "ratelimit", s, mins);
+    }
+    if (s === 403 && /approv/i.test(msg))
+      return new GitHubError("An owner of your organisation must approve this token before it works.", "approval", s);
     if (s === 403)
       return new GitHubError(
         "The token is not allowed to do this (403). It needs 'Contents: Read and write' on this repository.",
@@ -106,6 +124,32 @@ export class GitHubClient {
     if (s === 409 && /empty/i.test(msg))
       return new GitHubError("The repository is empty. Create an initial commit (e.g. a README) on the branch first.", "empty", s);
     return new GitHubError(`GitHub error ${s}${msg ? `: ${msg}` : ""}`, "other", s);
+  }
+
+  /**
+   * Connection test: the repo is visible and the token can write Contents. Writing an unreferenced
+   * blob is the only side-effect-free write GitHub offers (it is garbage-collected).
+   */
+  async checkRepo(opts: { write?: boolean } = { write: true }): Promise<{ defaultBranch: string; archived: boolean }> {
+    const r = await this.request<{ default_branch: string; archived?: boolean }>("GET", "");
+    if (opts.write && !r.archived) await this.createBlob(new Uint8Array(0));
+    return { defaultBranch: r.default_branch, archived: !!r.archived };
+  }
+
+  async branchExists(branch: string): Promise<boolean> {
+    try {
+      await this.request("GET", `/git/ref/heads/${encodePathSegments(branch)}`);
+      return true;
+    } catch (e) {
+      if (e instanceof GitHubError && e.kind === "notfound") return false;
+      throw e;
+    }
+  }
+
+  /** Create `branch` (this client's branch) from the head of `from`. */
+  async createBranch(from: string): Promise<void> {
+    const ref = await this.request<{ object: { sha: string } }>("GET", `/git/ref/heads/${encodePathSegments(from)}`);
+    await this.request("POST", "/git/refs", { ref: `refs/heads/${this.cfg.branch}`, sha: ref.object.sha });
   }
 
   async getHead(): Promise<{ commitSha: string; treeSha: string }> {

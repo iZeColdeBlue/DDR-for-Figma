@@ -27,9 +27,9 @@ export const withImages: DocModel = {
   blocks: [
     { type: "heading", level: 1, spans: [t("Buttons")] },
     { type: "paragraph", spans: [t("Use buttons to trigger actions.")] },
-    { type: "image", assetId: "12-345", alt: "Primary button", nodeId: "12:345" },
+    { type: "image", alt: "Primary button", nodeId: "12:345" },
     { type: "heading", level: 2, spans: [t("States")] },
-    { type: "image", assetId: "I12-346-1-2", alt: "States [hover] & focus", nodeId: "I12:346;1:2" },
+    { type: "image", alt: "States [hover] & focus", nodeId: "I12:346;1:2" },
     { type: "paragraph", spans: [t("Disabled buttons never show a tooltip.")] },
   ],
 };
@@ -46,7 +46,7 @@ export const listsAndLinks: DocModel = {
     { type: "list", ordered: false, items: [[t("Be clear")], [t("Be "), t("kind", { italic: true })], [t("Avoid "), t("jargon", { bold: true, italic: true })]] },
     { type: "heading", level: 2, spans: [t("Checklist")] },
     { type: "list", ordered: true, items: [[t("Draft")], [t("Review with "), t("a teammate", { href: "https://example.com/people" })], [t("Publish")]] },
-    { type: "image", assetId: "40-2", alt: "Tone scale", nodeId: "40:2" },
+    { type: "image", alt: "Tone scale", nodeId: "40:2" },
   ],
 };
 

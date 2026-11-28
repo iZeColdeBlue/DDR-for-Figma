@@ -1,7 +1,6 @@
 // Plugin main thread: orchestration only. All Figma access goes through `host` (src/extract/figmaHost.ts).
 import { host } from "./extract/figmaHost";
 import { buildDoc } from "./build";
-import { parseFileKey } from "./fileKey";
 import { normalizeFolder } from "./paths";
 import type { BuiltPayload, DocInfo, UIToMain } from "./messages";
 
@@ -23,14 +22,9 @@ function postSelection(): void {
 
 host.onSelectionChange(postSelection);
 
-async function resolveFileKey(figmaFileUrl: string): Promise<string | undefined> {
-  return host.fileKey() ?? (figmaFileUrl ? parseFileKey(figmaFileUrl) : undefined);
-}
-
-async function buildAll(): Promise<BuiltPayload[]> {
-  const settings = await host.loadSettings();
-  const docsFolder = normalizeFolder(settings.docsFolder);
-  const fileKey = await resolveFileKey(settings.figmaFileUrl);
+async function buildAll(folder: string): Promise<{ docs: BuiltPayload[]; fileKey?: string }> {
+  const docsFolder = normalizeFolder(folder);
+  const fileKey = host.fileKey();
   await refreshDocs();
   const out: BuiltPayload[] = [];
   const active = docs.filter((d) => !d.duplicate);
@@ -46,31 +40,26 @@ async function buildAll(): Promise<BuiltPayload[]> {
       fileKey,
       exportPng: (id) => host.exportPng(id),
     });
-    out.push({
-      docId: built.docId,
-      title: built.title,
-      relPath: built.relPath,
-      path: built.path,
-      nodeId: built.nodeId,
-      markdown: built.markdown,
-      files: built.files,
-      warnings: built.warnings,
-    });
+    out.push(built);
   }
-  return out;
+  return { docs: out, fileKey };
 }
 
 async function handle(m: UIToMain): Promise<void> {
   switch (m.type) {
     case "init": {
-      host.post({ type: "settings", settings: await host.loadSettings() });
+      // Config first, so the first screen shows without waiting for every page to load (listDocs).
+      host.post({ type: "config", ...(await host.loadConfig()) });
       await refreshDocs();
       postSelection();
+      if (docs.length && (await host.migrateLegacyFile())) host.post({ type: "config", ...(await host.loadConfig()) });
       return;
     }
-    case "saveSettings":
-      await host.saveSettings(m.settings);
-      host.post({ type: "settings", settings: m.settings });
+    case "saveFileConfig":
+      host.saveFileConfig(m.config);
+      return;
+    case "saveUserConfig":
+      await host.saveUserConfig(m.config);
       return;
     case "listDocs":
       await refreshDocs();
@@ -83,10 +72,6 @@ async function handle(m: UIToMain): Promise<void> {
       postSelection();
       return;
     }
-    case "setPath":
-      await host.setRelPath(m.docId, m.relPath, docs.filter((d) => d.docId !== m.docId).map((d) => d.relPath));
-      await refreshDocs();
-      return;
     case "reId": {
       const d = docs.find((x) => x.docId === m.docId && x.duplicate);
       if (!d) throw new Error("That frame is no longer a duplicate.");
@@ -98,7 +83,7 @@ async function handle(m: UIToMain): Promise<void> {
       await host.focus(m.docId);
       return;
     case "build": {
-      host.post({ type: "built", docs: await buildAll() });
+      host.post({ type: "built", ...(await buildAll(m.docsFolder)) });
       return;
     }
   }
@@ -112,7 +97,7 @@ host.onMessage((m) => {
   const isBuild = m.type === "build";
   if (isBuild) busy = true;
   handle(m)
-    .catch((e: unknown) => host.post({ type: "error", message: e instanceof Error ? e.message : String(e) }))
+    .catch((e: unknown) => host.post({ type: "error", message: e instanceof Error ? e.message : String(e), build: isBuild }))
     .finally(() => {
       if (isBuild) busy = false;
     });

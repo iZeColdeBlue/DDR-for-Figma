@@ -31,8 +31,17 @@ export function markdownToHtml(md: string, resolveImage: ImageResolver): string 
   return out.join("\n");
 }
 
+// decodeURI throws on a stray "%" (e.g. "100%"); keep the raw text instead of crashing the preview.
+function tryDecode(u: string): string {
+  try {
+    return decodeURI(u);
+  } catch {
+    return u;
+  }
+}
+
 function safeHref(u: string): string {
-  const url = decodeURI(u);
+  const url = tryDecode(u);
   return /^(https?:|mailto:|#|[^:]*$)/i.test(url) ? esc(u) : "#";
 }
 
@@ -59,7 +68,7 @@ export function inline(s: string, resolveImage: ImageResolver): string {
     } else if (c === "!" && s[i + 1] === "[") {
       const m = /^!\[((?:\\.|[^\]\\])*)\]\(([^)\s]*)\)/.exec(s.slice(i));
       if (m) {
-        const src = resolveImage(decodeURI(m[2]));
+        const src = resolveImage(tryDecode(m[2]));
         out += src ? `<img alt="${esc(m[1].replace(/\\(.)/g, "$1"))}" src="${esc(src)}">` : `<em>[missing image ${esc(m[2])}]</em>`;
         i += m[0].length;
       } else {

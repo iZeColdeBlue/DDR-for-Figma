@@ -31,4 +31,8 @@ describe("preview renderer", () => {
     expect(markdownToHtml("[x](javascript:alert(1))", noImg)).not.toContain("javascript:alert");
     expect(markdownToHtml("![a](missing.png)", noImg)).toContain("missing image");
   });
+  it("does not throw on a stray % in a link or image path", () => {
+    expect(markdownToHtml("[x](https://a.b/100%)", noImg)).toContain('href="https://a.b/100%"');
+    expect(markdownToHtml("![a](d%/x.png)", noImg)).toContain("missing image");
+  });
 });

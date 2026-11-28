@@ -10,7 +10,6 @@ export const seg = (text: string, o: Partial<TextSegmentLike> = {}): TextSegment
   fontStyle: "Regular",
   fontWeight: 400,
   list: "NONE",
-  indentation: 0,
   ...o,
 });
 
