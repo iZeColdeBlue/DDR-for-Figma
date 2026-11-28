@@ -1,0 +1,27 @@
+{
+  "name": "figma-docs-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Figma plugin: turn doc frames into Markdown and sync them to a GitHub repo (MVP)",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test",
+    "harness:ui": "npm run build && node scripts/ui-harness.mjs",
+    "coverage": "vitest run --coverage --coverage.include=\"src/sync/**\" --coverage.include=\"src/render/**\" --coverage.include=\"src/extract/extract.ts\" --coverage.reporter=text"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.143.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/red-hat-mono": "^5.3.0",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.1",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
+}
