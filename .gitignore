@@ -6,3 +6,14 @@ node_modules
 out/
 dist/
 code.js
+
+# macOS
+.DS_Store
+
+# Local editor / Claude Code config
+.vscode/
+.claude/
+
+# Local dev notes (kept on disk, not published)
+figma-docs-sync/REPORT.md
+figma-docs-sync/PLAN-settings-split.md

@@ -10,4 +10,5 @@ npm run check      # typecheck + tests
 ```
 
 In Figma, import the plugin from `figma-docs-sync/manifest.json`.
-In VS Code, **Terminal → Run Build Task** runs the build in that folder.
+
+Design material (mockups, handovers, design decisions) lives in [`design/`](design/). It is not part of the plugin and is left out of ZIP downloads.
