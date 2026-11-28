@@ -1,0 +1,9 @@
+node_modules
+dist
+*.log
+.env
+.e2e-out
+
+# Stray tsc output: sources are .ts, bundles go to dist/
+src/**/*.js
+tests/**/*.js

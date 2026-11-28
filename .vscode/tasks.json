@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docs Sync: build",
+      "type": "npm",
+      "script": "build",
+      "path": "figma-docs-sync",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$esbuild"]
+    },
+    {
+      "label": "Docs Sync: check (typecheck + tests)",
+      "type": "npm",
+      "script": "check",
+      "path": "figma-docs-sync",
+      "group": "test",
+      "problemMatcher": ["$tsc"]
+    }
+  ]
+}
